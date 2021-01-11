@@ -1,109 +1,483 @@
 <!DOCTYPE html>
 <html>
-    <head>
-        <title>audio visualizer with audio element</title>
-
-<style type="text/css">
-body {
-    background-image: radial-gradient(circle, #F0C505, #F76E2A 10%, #A71A5B 40%, #651366);
-    position: relative;
-    overflow: hidden;
-    text-align: center;
-    color: #fff;
-}
-a{
-    color:yellow;
-}
-.bar-wrapper {
-    height: 300px;
-    position: relative;
-}
-.bar {
-    position: relative;
-    bottom: 0;
-    width: 5px;
-    display: inline-block;
-    border: 1px solid red;
-    height: 5px;
-    border-bottom: 3px solid #fff;
-}
-</style>
-
-    </head>
-    <body>
-    <h3>RESPONSI MULON ||audio visualizer</h3>
-   
-        <canvas id='canvas' width="800" height="350"></canvas>
-        <br>
-        <br>
-        <audio src="Sesuatu Di Jogja - Adhitia Sofyan (official audio).mp3" id="audio" controls>audio element not supported</audio>
-        
+<head>
+    <title>RESPONSI MULON PUZZLE DAN AUDIO || BY JIHAN</title>
     <script>
-            window.AudioContext = window.AudioContext || window.webkitAudioContext || window.mozAudioContext;
-        
-        var start = function() {
-            var audio = document.getElementById('audio');
-            var ctx = new AudioContext();
-            var analyser = ctx.createAnalyser();
-            var audioSrc = ctx.createMediaElementSource(audio);
-            audioSrc.connect(analyser);
-            analyser.connect(ctx.destination);
-            var frequencyData = new Uint8Array(analyser.frequencyBinCount);
-            var canvas = document.getElementById('canvas'),
-                cwidth = canvas.width,
-                cheight = canvas.height - 2,
-                meterWidth = 10, 
-                gap = 2, 
-                capHeight = 2,
-                capStyle = '#fff',
-                meterNum = 800 / (10 + 2), 
-                capYPositionArray = []; 
-            ctx = canvas.getContext('2d'),
-            gradient = ctx.createLinearGradient(0, 0, 0, 300);
-            gradient.addColorStop(1, '#0f0');
-            gradient.addColorStop(0.5, '#ff0');
-            gradient.addColorStop(0, '#f00');
-            // loop
-            function renderFrame() {
-                var array = new Uint8Array(analyser.frequencyBinCount);
-                analyser.getByteFrequencyData(array);
-                var step = Math.round(array.length / meterNum); 
-                ctx.clearRect(0, 0, cwidth, cheight);
-                for (var i = 0; i < meterNum; i++) {
-                    var value = array[i * step];
-                    if (capYPositionArray.length < Math.round(meterNum)) {
-                        capYPositionArray.push(value);
-                    };
-                    ctx.fillStyle = capStyle;
-        
-                    if (value < capYPositionArray[i]) {
-                        ctx.fillRect(i * 12, cheight - (--capYPositionArray[i]), meterWidth, capHeight);
-                    } else {
-                        ctx.fillRect(i * 12, cheight - value, meterWidth, capHeight);
-                        capYPositionArray[i] = value;
-                    };
-                    ctx.fillStyle = gradient; 
-                    ctx.fillRect(i * 12, cheight - value + capHeight, meterWidth, cheight); 
-                }
-                requestAnimationFrame(renderFrame);
-            }
-            renderFrame();
-            // audio.play();
-        };
-        
-        audio.onplay = function(){
-            start();
+
+function imageBlock(no, x, y) {
+        this.no = no;
+        this.x = x;
+        this.y = y;
+        this.isSelected = false;
         }
-        </script>
-    </body>
-    <script>
-      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
-      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
-      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
-      })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
 
-      ga('create', 'UA-46794744-6', 'auto');
-      ga('send', 'pageview');
+function gamepuzzle(canvasID, imageID, rows,columns) {
+
+var MAIN_IMG_WIDTH = 800;
+var MAIN_IMG_HEIGHT = 600;
+
+var BLOCK_IMG_WIDTH = 600;
+var BLOCK_IMG_HEIGHT = 450;
+
+var TOTAL_ROWS = rows;// 4;
+var TOTAL_COLUMNS = columns;  //4;
+
+var TOTAL_PIECES = TOTAL_ROWS * TOTAL_COLUMNS;
+
+var IMG_WIDTH = Math.round(MAIN_IMG_WIDTH / TOTAL_COLUMNS);
+var IMG_HEIGHT = Math.round(MAIN_IMG_HEIGHT / TOTAL_ROWS);
+
+var BLOCK_WIDTH = 0; 
+var BLOCK_HEIGHT = 0; 
+
+var image1;
+var canvas;
+var ctx;
+
+this.canvasID = canvasID;
+this.imageID = imageID;
+
+this.top = 0;
+this.left = 0;
+
+this.imageBlockList = new Array();
+this.blockList = new Array();
+this.selectedBlock = null;
+
+this.mySelf = this;
+this.initDrawing = function () {
+    mySelf = this;
+    selectedBlock = null;
+    canvas = document.getElementById(canvasID);
+
+    ctx = canvas.getContext('2d');
+
+    //canvas.ondblclick = handleOnMouseDbClick;
+    canvas.onmousedown = handleOnMouseDown;
+    canvas.onmouseup = handleOnMouseUp;
+    canvas.onmouseout = handleOnMouseOut;
+    canvas.onmousemove = handleOnMouseMove;
+
+    image1 = document.getElementById(imageID);
+    initializeNewGame();
+};
+
+function initializeNewGame() {
+
+    // Set block 
+    BLOCK_WIDTH = Math.round(BLOCK_IMG_WIDTH / TOTAL_COLUMNS);
+    BLOCK_HEIGHT = Math.round(BLOCK_IMG_HEIGHT / TOTAL_ROWS);
+
+    // gambar image
+    SetImageBlock();
+    DrawGame();
+}
+
+this.showPreview = function () {
+
+    var x1 = 20;
+    var y1 = 20;
+    var width = BLOCK_IMG_WIDTH - (x1 * 2);
+    var height = BLOCK_IMG_HEIGHT - (y1 * 2);
+
+    ctx.save();
+    ctx.drawImage(image1, 0, 0, MAIN_IMG_WIDTH, MAIN_IMG_HEIGHT, x1, y1, width, height);
+
+    //gambar empat persegi panjang
+    ctx.fillStyle = '#00f'; // biru
+    ctx.strokeStyle = '#f00'; // merah
+    ctx.lineWidth = 4;
+    ctx.strokeRect(x1 - 2, y1 - 2, width + 4, height + 4);
+    ctx.restore();
+};
+
+function DrawGame() {
+
+    clear(ctx);
+    drawLines();
+    drawAllImages();
+
+    if (selectedBlock) {
+        drawImageBlock(selectedBlock);
+    }
+}
+
+function SetImageBlock() {
+
+    var total = TOTAL_PIECES;
+    imageBlockList = new Array();
+    blockList = new Array();
+
+    var x1 = BLOCK_IMG_WIDTH + 20;
+    var x2 = canvas.width - 50;
+    var y2 = BLOCK_IMG_HEIGHT;
+    for (var i = 0; i < total; i++) {
+
+        var randomX = randomXtoY(x1, x2, 2);
+        var randomY = randomXtoY(0, y2, 2);
+   
+        var imgBlock = new imageBlock(i, randomX, randomY);
+
+        imageBlockList.push(imgBlock);
+
+        var x = (i % TOTAL_COLUMNS) * BLOCK_WIDTH;
+        var y = Math.floor(i / TOTAL_COLUMNS) * BLOCK_HEIGHT;
+
+        var block = new imageBlock(i, x, y);
+        blockList.push(block);
+    }
+}
+
+function drawLines() {
+   
+    ctx.strokeStyle = "#e9e9e9";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    
+    // gambar garis vertikal
+    for (var i = 0; i <= TOTAL_COLUMNS; i++) {
+        var x = BLOCK_WIDTH * i;
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, 450);
+    }
+
+    // gambar garis horizontal
+    for (var i = 0; i <= TOTAL_ROWS; i++) {
+        var y = BLOCK_HEIGHT * i;
+        ctx.moveTo(0, y);
+        ctx.lineTo(600, y);
+    }
+
+    ctx.closePath();
+    ctx.stroke();
+}
+
+function drawAllImages() {
+
+    for (var i = 0; i < imageBlockList.length; i++) {
+        var imgBlock = imageBlockList[i];
+        if (imgBlock.isSelected == false) {
+
+            drawImageBlock(imgBlock);
+        }
+    }
+}
+
+function drawImageBlock(imgBlock) {
+    
+    drawFinalImage(imgBlock.no, imgBlock.x, imgBlock.y, BLOCK_WIDTH, BLOCK_HEIGHT);
+}
+function drawFinalImage(index, destX, destY, destWidth, destHeight) {
+
+    ctx.save();
+    var srcX = (index % TOTAL_COLUMNS) * IMG_WIDTH;
+    var srcY = Math.floor(index / TOTAL_COLUMNS) * IMG_HEIGHT;
+    ctx.drawImage(image1, srcX, srcY, IMG_WIDTH, IMG_HEIGHT, destX, destY, destWidth, destHeight);
+    ctx.restore();
+}
+
+function drawImage(image) {
+
+    ctx.save();
+    ctx.drawImage(image, 0, 0, BLOCK_WIDTH, BLOCK_WIDTH, 10, 10, BLOCK_WIDTH, BLOCK_WIDTH);
+    ctx.restore();
+}
+
+var interval = null;
+var remove_width;
+var remove_height;
+
+function OnFinished() {
+
+    var audioElement = document.createElement('audio');
+    audioElement.setAttribute('src','finish.mp3');
+    audioElement.play();
+
+    remove_width = BLOCK_WIDTH;
+    remove_height = BLOCK_HEIGHT;
+   
+    interval = setInterval(function () { mySelf.ClearGame(); }, 100);
+}
+
+this.ClearGame = function () {
+    //   alert("f");
+    remove_width -= 30;
+    remove_height -= 20;
+
+    if (remove_width > 0 && remove_height > 0) {
+
+        clear(ctx);
+
+        for (var i = 0; i < imageBlockList.length; i++) {
+            var imgBlock = imageBlockList[i];
+
+            imgBlock.x += 10;
+            imgBlock.y += 10;
+
+            drawFinalImage(imgBlock.no, imgBlock.x, imgBlock.y, remove_width, remove_height);
+        }
+
+        // gambar game();
+    } else {
+
+        clearInterval(interval);
+       
+        // restart game
+        initializeNewGame(); 
+    }
+};
+
+function handleOnMouseDbClick(e) {
+
+    // selectedBlock = GetImageBlock(e.pageX, e.pageY);
+    //alert("clicked");
+
+}
+
+function handleOnMouseOut(e) {
+
+    if (selectedBlock != null) {
+
+        imageBlockList[selectedBlock.no].isSelected = false;
+        selectedBlock = null;
+        DrawGame();
+
+    }
+
+}
+
+function handleOnMouseDown(e) {
+    if (selectedBlock != null) {
+
+        imageBlockList[selectedBlock.no].isSelected = false;
+
+    }
+    selectedBlock = GetImageBlock(imageBlockList, e.pageX, e.pageY);
+    if (selectedBlock) {
+        imageBlockList[selectedBlock.no].isSelected = true;
+    }
+
+}
+
+function handleOnMouseUp(e) {
+
+    if (selectedBlock) {
+        var index = selectedBlock.no;
+        //   alert(index);
+
+        var block = GetImageBlock(blockList, e.pageX, e.pageY);
+        if (block) {
+
+            var blockOldImage = GetImageBlockOnEqual(imageBlockList, block.x, block.y);
+            if (blockOldImage == null) {
+                imageBlockList[index].x = block.x;
+                imageBlockList[index].y = block.y;
+            }
+        }
+        else {
+            imageBlockList[index].x = selectedBlock.x;
+            imageBlockList[index].y = selectedBlock.y;
+        }
+
+        imageBlockList[index].isSelected = false;
+        selectedBlock = null;
+        DrawGame();
+
+        if (isFinished()) {
+            OnFinished();
+        }
+
+    }
+}
+function handleOnMouseMove(e) {
+
+    if (selectedBlock) {
+
+        selectedBlock.x = e.pageX  - 25;
+        selectedBlock.y = e.pageY  - 25;
+
+        DrawGame();
+    }
+}
+
+function clear(c) {
+    c.clearRect(0, 0, canvas.width, canvas.height);
+}
+function randomXtoY(minVal, maxVal, floatVal) {
+    var randVal = minVal + (Math.random() * (maxVal - minVal));
+    var val = typeof floatVal == 'undefined' ? Math.round(randVal) : randVal.toFixed(floatVal);
+
+    return Math.round(val);
+}
+function GetImageBlock(list, x, y) {
+
+    //for (var i = 0; i < list.length; i++) {
+    for (var i = list.length - 1; i >= 0; i--) {
+        var imgBlock = list[i];
+
+        var x1 = imgBlock.x;
+        var x2 = x1 + BLOCK_WIDTH;
+
+        var y1 = imgBlock.y;
+        var y2 = y1 + BLOCK_HEIGHT;
+
+        if (
+            (x >= x1 && x <= x2) &&
+            (y >= y1 && y <= y2)
+        ) {
+            //alert("found: " + imgBlock.no);
+
+            var img = new imageBlock(imgBlock.no, imgBlock.x, imgBlock.y);
+            return img;
+        }
+    }
+    return null;
+}
+function GetImageBlockOnEqual(list, x, y) {
+
+    for (var i = 0; i < list.length; i++) {
+        var imgBlock = list[i];
+
+        var x1 = imgBlock.x;
+        var y1 = imgBlock.y;
+
+        if (
+            (x == x1) &&
+            (y == y1)
+        ) {
+
+            var img = new imageBlock(imgBlock.no, imgBlock.x, imgBlock.y);
+            return img;
+        }
+    }
+    return null;
+}
+
+function isFinished() {
+
+    var total = TOTAL_PIECES;
+
+    for (var i = 0; i < total; i++) {
+
+        var img = imageBlockList[i];
+        var block = blockList[i];
+
+        if (
+            (img.x != block.x) ||
+            (img.y != block.y)
+            ) {
+            return false;
+        }
+    }
+    return true;
+}
+}
+    </script>
+    <script type="text/javascript">
+
+        var game = null;
+        var imageID = "img1";
+        var totalRows = 3;
+        var totalColumns = 3;
+
+        function InitGame() {
+            LoadNewImage(imageID);
+        }
+
+        function LoadNewImage(imgID) {
+            imageID = imgID;
+            
+            SetRowsColumn();    
+            LoadGame();
+        }
+        
+        function LoadGame() {
+            var canvasID = "canpuzzle";
+
+            game = new gamepuzzle(canvasID, imageID, totalRows, totalColumns);
+            game.initDrawing();
+
+        }
+
+        function ShowPreview() {
+            if (game) {
+
+                game.showPreview();
+            }
+        }
+
+        function SetRowsColumn() {
+            var r1 = document.getElementById("rd1");
+            var r2 = document.getElementById("rd2");
+            var r3 = document.getElementById("rd3");
+
+            if (r1.checked) {
+                totalRows = 2;
+                totalColumns = 2;
+            }
+            else if (r2.checked) {
+                totalRows = 3;
+                totalColumns = 3;
+            }
+            else if (r3.checked) {
+                totalRows = 4;
+                totalColumns = 4;
+            }
+        }
 
     </script>
+</head>
+
+<body onload="InitGame();">
+    <table>
+        <tr>
+            <td>
+                <div>
+                    <table cellpadding="0" cellspacing="0" width="100%">
+                        <tr>
+                            <td>
+                                <span>
+                                    <input id="rd1" type="radio" value="Easy" name="r1" onclick="InitGame();" />
+                                    Easy
+                                    <input id="rd2" type="radio" value="Medium" name="r1" onclick="InitGame();" checked />
+                                    Medium
+                                    <input id="rd3" type="radio" value="Hard" name="r1" onclick="InitGame();" />
+                                    Hard</span>
+                            </td>
+                            <td width="150px">
+                                <span >
+                                    <input type="button" value="Show Preview" onclick="ShowPreview()" >
+                                </span>
+                                <td width="150px">
+                                    <span >
+                                    <audio src="Sesuatu Di Jogja - Adhitia Sofyan (official audio).mp3" id="audio" controls>audio element not supported</audio>
+                                </span>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div>
+                    <canvas id="canpuzzle" width="850" height="575" style="border: black solid 2px;"></canvas>
+                </div>
+            </td>
+            <td width="20px">
+                &nbsp;
+            </td>
+            <td style="vertical-align: top;">
+                <div style="font-size:10px; text-align:center;">Double click on image to select.</div>
+                <div alig ="right" style="height: 585px; width: 320px; border: black solid 1px; overflow: auto;">
+                    <div>
+                        <img id="img1" width="300" height="200" ondblclick="LoadNewImage(this.id);" src="BugsLife.jpg"></img>
+                    </div>
+                    <div>
+                        <img id="img2" width="300" height="200" ondblclick="LoadNewImage(this.id);" src="WTP.jpg"></img>
+                    </div>
+                    <div>
+                        <img id="img3" width="300" height="200" ondblclick="LoadNewImage(this.id);" src="Cartoon.jpg"></img>
+                    </div>
+                </div>
+            </td>
+        </tr>
+    </table>
+</body>
 </html>
