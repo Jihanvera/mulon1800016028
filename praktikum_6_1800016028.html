@@ -1,158 +1,205 @@
-<!DOCTYPE html>
+
 <html>
-<head>
-<meta charset="utf-8">
-<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-<meta name="viewport" content="width=device-width">
-<title>example</title>
-<link rel="stylesheet" href="">
-
-</head>
-<body onload="startApp()">
-<canvas id="canvas"></canvas>
-<p id="controls">
-<input type="button" id="start_button" value="Start">
-&nbsp; &nbsp;
-<input type="button" id="stop_button" value="Stop">
-<p id="msg"></p>
-</p>
-<!-- ----------------------------------------------------- -->
-<style>
-#canvas {
-margin-left: auto;
-margin-right: auto;
-display: block;
-background-color: green;
-}
-#controls {
-text-align: center;
-}
-#start_button, #stop_button {
-font-size: 16pt;
-}
-#msg {
-text-align: center;
-}
+<canvas width="460" height="320"></canvas>
+<div class="call-to-action">Click to play!</div>
+<style type="text/css">
+html, body {
+    height: 100%;
+  }
+  
+  body {
+    background-image: radial-gradient(circle, #F0C505, #F76E2A 10%, #A71A5B 40%, #651366);
+    position: relative;
+    overflow: hidden;
+  }
+  
+  canvas {
+    display: block;
+  }
+  
+  .call-to-action {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #FFF;
+    cursor: pointer;
+  }
 </style>
-<!-- ----------------------------------------------------- -->
+<script>
+    let canvas = document.querySelector("canvas");
+let ctx = canvas.getContext("2d");
 
-<script type="text/javascript">
-// Hacks to deal with different function names in different browsers
-window.requestAnimFrame = (function(){
-return window.requestAnimationFrame       ||
-       window.webkitRequestAnimationFrame ||
-       window.mozRequestAnimationFrame    ||
-       function(callback, element){
-         window.setTimeout(callback, 1000 / 60);
-       };
-})();
-window.AudioContext = (function(){
-return window.webkitAudioContext || window.AudioContext ||
-window.mozAudioContext;
-})();
-// Global Variables for Audio
-var audioContext;
-var audioBuffer;
-var sourceNode;
-var analyserNode;
-var javascriptNode;
-var audioData = null;
-var audioPlaying = false;
-var sampleSize = 1024;
-var amplitudeArray;
-var audioUrl = "Sesuatu Di Jogja - Adhitia Sofyan (official audio).mp3";
-// Global Variables for the Graphics
-var canvasWidth = 1000;
-var canvasHeight = 450;
-var ctx;
-function startApp() {
-var c=document.getElementById('canvas');
-c.width=canvasWidth;
-c.height=canvasHeight;
-ctx = c.getContext("2d");
-try {
-audioContext = new AudioContext();
-} catch(e) {
-alert('Web Audio API is not supported in this browser');
-}
-// gather samples for the analysis, update the canvas
-var startBtn=document.getElementById('start_button');
-startBtn.onclick= function(e) {
-e.preventDefault();
-setupAudioNodes();
-javascriptNode.onaudioprocess = function () {
-analyserNode.getByteTimeDomainData(amplitudeArray);
-// draw the display if the audio is playing
+canvas.width = document.body.clientWidth;
+canvas.height = document.body.clientHeight;
 
-if (audioPlaying == true) {
-    requestAnimFrame(drawTimeDomain);
-}
-}
-if(audioData == null) {
-loadSound(audioUrl);
+let centerX = canvas.width / 2;
+let centerY = canvas.height / 2;
+let radius = document.body.clientWidth <= 425 ? 120 : 160;
+let steps = document.body.clientWidth <= 425 ? 60 : 120;
+let interval = 360 / steps;
+let pointsUp = [];
+let pointsDown = [];
+let running = false;
+let pCircle = 2 * Math.PI * radius;
+let angleExtra = 90;
 
-} else {
-playSound(audioData);
+// Create points
+for(let angle = 0; angle < 360; angle += interval) {
+  let distUp = 1.1;
+  let distDown = 0.9;
+
+  pointsUp.push({
+    angle: angle + angleExtra,
+    x: centerX + radius * Math.cos((-angle + angleExtra) * Math.PI / 180) * distUp,
+    y: centerY + radius * Math.sin((-angle + angleExtra) * Math.PI / 180) * distUp,
+    dist: distUp
+  });
+
+  pointsDown.push({
+    angle: angle + angleExtra + 5,
+    x: centerX + radius * Math.cos((-angle + angleExtra + 5) * Math.PI / 180) * distDown,
+    y: centerY + radius * Math.sin((-angle + angleExtra + 5) * Math.PI / 180) * distDown,
+    dist: distDown
+  });
 }
-};
-// Stop the audio playing
-var stopBtn=document.getElementById('stop_button');
-stopBtn.onclick=function(e) {
-e.preventDefault();
-sourceNode.stop(0);
-audioPlaying = false;
-};
-};
-function setupAudioNodes() {
-sourceNode = audioContext.createBufferSource();
-analyserNode = audioContext.createAnalyser();
-javascriptNode = audioContext.createScriptProcessor(sampleSize, 1, 1);
-amplitudeArray = new Uint8Array(analyserNode.frequencyBinCount);
-// Now connect the nodes together
-sourceNode.connect(audioContext.destination);
-sourceNode.connect(analyserNode);
-analyserNode.connect(javascriptNode);
-javascriptNode.connect(audioContext.destination);
+
+// -------------
+// Audio stuff
+// -------------
+
+// make a Web Audio Context
+const context = new AudioContext();
+const splitter = context.createChannelSplitter();
+
+const analyserL = context.createAnalyser();
+analyserL.fftSize = 8192;
+
+const analyserR = context.createAnalyser();
+analyserR.fftSize = 8192;
+
+splitter.connect(analyserL, 0, 0);
+splitter.connect(analyserR, 1, 0);
+
+// Make a buffer to receive the audio data
+const bufferLengthL = analyserL.frequencyBinCount;
+const audioDataArrayL = new Uint8Array(bufferLengthL);
+
+const bufferLengthR = analyserR.frequencyBinCount;
+const audioDataArrayR = new Uint8Array(bufferLengthR);
+
+// Make a audio node
+const audio = new Audio();
+
+function loadAudio() {
+  audio.loop = false;
+  audio.autoplay = false;
+  audio.crossOrigin = "anonymous";
+
+  // call `handleCanplay` when it music can be played
+  audio.addEventListener('canplay', handleCanplay);
+  audio.src = "https://s3.eu-west-2.amazonaws.com/nelsoncodepen/Audiobinger_-_The_Garden_State.mp3";
+  audio.load();
+  running = true;
 }
-function loadSound(url) {
-document.getElementById('msg').textContent = "Loading audio...";
-var request = new XMLHttpRequest();
-request.open('GET', url, true);
-request.responseType = 'arraybuffer';
-request.onload = function () {
-audioContext.decodeAudioData(request.response, function
-(buffer) {
-document.getElementById('msg').textContent = "Audio sample download finished";
-audioData = buffer;
-playSound(audioData);
-}, onError);
+
+function handleCanplay() {
+  // connect the audio element to the analyser node and the analyser node
+  // to the main Web Audio context
+  const source = context.createMediaElementSource(audio);
+  source.connect(splitter);
+  splitter.connect(context.destination);
 }
-request.send();
+
+function toggleAudio() {
+  if (running === false) {
+    loadAudio();
+    document.querySelector('.call-to-action').remove();
+  }
+
+  if (audio.paused) {
+    audio.play();
+  } else {
+    audio.pause();
+  }
 }
-function playSound(buffer) {
-sourceNode.buffer = buffer;
-sourceNode.start(0);
-sourceNode.loop = true;
-audioPlaying = true;
+
+canvas.addEventListener('click', toggleAudio);
+
+document.body.addEventListener('touchend', function(ev) {
+  context.resume();
+});
+
+// -------------
+// Canvas stuff
+// -------------
+
+function drawLine(points) {
+  let origin = points[0];
+
+  ctx.beginPath();
+  ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+  ctx.lineJoin = 'round';
+  ctx.moveTo(origin.x, origin.y);
+
+  for (let i = 0; i < points.length; i++) {
+    ctx.lineTo(points[i].x, points[i].y);
+  }
+
+  ctx.lineTo(origin.x, origin.y);
+  ctx.stroke();
 }
-function onError(e) {
-console.log(e);
+
+function connectPoints(pointsA, pointsB) {
+  for (let i = 0; i < pointsA.length; i++) {
+    ctx.beginPath();
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+    ctx.moveTo(pointsA[i].x, pointsA[i].y);
+    ctx.lineTo(pointsB[i].x, pointsB[i].y);
+    ctx.stroke();
+  }
 }
-function drawTimeDomain() {
-clearCanvas();
-for (var i = 0; i < amplitudeArray.length; i++) {
-var value = amplitudeArray[i] / 300;
-var y = canvasHeight - (canvasHeight * value) - 1;
-var x = i*canvasWidth/amplitudeArray.length;
-var clr=['red','blue','yellow'];
-var color=Math.floor(Math.random()*10);
-ctx.fillStyle = "praktikum_5_1800016028.html";
-ctx.fillRect(x, 0, 2, y);
+
+function update(dt) {
+  let audioIndex, audioValue;
+
+  // get the current audio data
+  analyserL.getByteFrequencyData(audioDataArrayL);
+  analyserR.getByteFrequencyData(audioDataArrayR);
+
+  for (let i = 0; i < pointsUp.length; i++) {
+    audioIndex = Math.ceil(pointsUp[i].angle * (bufferLengthL / (pCircle * 2))) | 0;
+    // get the audio data and make it go from 0 to 1
+    audioValue = audioDataArrayL[audioIndex] / 255;
+
+    pointsUp[i].dist = 1.1 + audioValue * 0.8;
+    pointsUp[i].x = centerX + radius * Math.cos(-pointsUp[i].angle * Math.PI / 180) * pointsUp[i].dist;
+    pointsUp[i].y = centerY + radius * Math.sin(-pointsUp[i].angle * Math.PI / 180) * pointsUp[i].dist;
+
+    audioIndex = Math.ceil(pointsDown[i].angle * (bufferLengthR / (pCircle * 2))) | 0;
+    // get the audio data and make it go from 0 to 1
+    audioValue = audioDataArrayR[audioIndex] / 255;
+
+    pointsDown[i].dist = 0.9 + audioValue * 0.2;
+    pointsDown[i].x = centerX + radius * Math.cos(-pointsDown[i].angle * Math.PI / 180) * pointsDown[i].dist;
+    pointsDown[i].y = centerY + radius * Math.sin(-pointsDown[i].angle * Math.PI / 180) * pointsDown[i].dist;
+  }
 }
+
+function draw(dt) {
+  requestAnimationFrame(draw);
+
+  if (running) {
+    update(dt);
+  }
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  drawLine(pointsUp);
+  drawLine(pointsDown);
+  connectPoints(pointsUp, pointsDown);
 }
-function clearCanvas() {
-ctx.clearRect(0, 0, canvasWidth, canvasHeight);
-}
+
+draw();
 </script>
-</body>
 </html>
